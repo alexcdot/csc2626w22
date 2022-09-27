@@ -40,8 +40,8 @@ def run(steering_network, args):
         
         state, expert_action, reward, done, _, eh, ed = env.step(learner_action) 
 
-        error_headings.append(eh)
-        error_dists.append(ed)
+        error_headings.append(abs(eh))
+        error_dists.append(abs(ed))
         if done:
             break
         

@@ -1,5 +1,6 @@
 from distutils.log import error
-from utils import str2bool
+from driving_policy import DiscreteDrivingPolicy
+from utils import DEVICE, str2bool
 import train_policy
 import racer
 import argparse
@@ -39,6 +40,7 @@ if __name__ == "__main__":
 
     aggr_error_headings = []
     aggr_error_dists = []
+    aggr_num_steps = []
 
     for dagger_iter in range(args.dagger_iterations + 1):
         if dagger_iter == 0:
@@ -47,7 +49,12 @@ if __name__ == "__main__":
             print ('\nRETRAINING LEARNER ON AGGREGATED DATASET, ITER', dagger_iter)
     
         args.weights_out_file = f"./weights/learner_{dagger_iter}.weights"
-        steering_network = train_policy.main(args)
+        train_policy.main(args)
+
+        # Load best steering network
+        steering_network = DiscreteDrivingPolicy(args.n_steering_classes)
+        steering_network.load_weights_from(args.weights_out_file)
+        steering_network = steering_network.to(DEVICE)
 
         if dagger_iter == args.dagger_iterations - 1:
             continue
@@ -61,13 +68,18 @@ if __name__ == "__main__":
             "--n_steering_classes", str(args.n_steering_classes)
         ])
         error_headings, error_dists = racer.run(steering_network, dagger_args)
-        error_heading = sum(error_headings) / len(error_headings)
-        error_dist = sum(error_dists) / len(error_dists)
-        print(f"Iter: {dagger_iter} | Error heading: {error_heading} error distance: {error_dist}")
+        error_heading = sum(error_headings)
+        error_dist = sum(error_dists)
+        num_steps = len(error_headings)
+
+        print(f"Iter: {dagger_iter} |",
+            f"Error heading: {error_heading} error distance: {error_dist} num steps: {num_steps}")
         aggr_error_headings.append(error_heading)
         aggr_error_dists.append(error_dist)
+        aggr_num_steps.append(num_steps)
 
-    aggr_errors = {"aggr_error_headings": aggr_error_dists, "aggr_error_dists": aggr_error_dists}
+    aggr_errors = {"aggr_error_headings": aggr_error_headings, "aggr_error_dists": aggr_error_dists,
+        "aggr_num_steps": aggr_num_steps}
     print(aggr_errors)
 
     json.dump(aggr_errors, open(f"./outputs_dagger_iters_{args.dagger_iterations}_epochs_{args.n_epochs}", "w"))
