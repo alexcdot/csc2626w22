@@ -10,7 +10,7 @@ import re
 
 class DrivingDataset(Dataset):
     
-    def __init__(self, root_dir, categorical = False, classes=-1, transform=None):
+    def __init__(self, root_dir, categorical = False, classes=-1, transform=None, min_turns_per_batch=0, batch_size=256):
         """
         root_dir (string): Directory with all the images.
         transform (callable, optional): Optional transform to be applied on a sample.
@@ -20,23 +20,47 @@ class DrivingDataset(Dataset):
         self.filenames = [f for f in listdir(self.root_dir) if f.endswith('jpg')]
         self.categorical = categorical
         self.classes = classes
+        self.min_turns_per_batch = min_turns_per_batch
+        self.samples_served = 0
+        self.turns_served_this_batch = 0
+        self.batch_size = batch_size
         
     def __len__(self):
         return len(self.filenames)
         
     def __getitem__(self, idx):
-        basename = self.filenames[idx]
-        img_name = os.path.join(self.root_dir, basename)
-        image = io.imread(img_name)
+        need_turn = (
+            self.min_turns_per_batch > 0
+            and (self.samples_served + self.min_turns_per_batch) >= self.batch_size
+            and (self.turns_served_this_batch < self.min_turns_per_batch)
+        )
 
-        m = re.search('expert_([0-9]+)_([0-9]+)_([-+]?\d*\.\d+|\d+).jpg', basename)
-        steering_command = np.array(float(m.group(3)), dtype=np.float32)
+        found_data = False
+        while not found_data:
+            basename = self.filenames[idx]
+            img_name = os.path.join(self.root_dir, basename)
+            image = io.imread(img_name)
 
-        if self.categorical:
-            steering_command = int(((steering_command + 1.0)/2.0) * (self.classes - 1)) 
+            m = re.search('expert_([0-9]+)_([0-9]+)_([-+]?\d*\.\d+|\d+).jpg', basename)
+            steering_command = np.array(float(m.group(3)), dtype=np.float32)
+
+            is_turn = np.abs(steering_command) > 0.1
+            self.turns_served_this_batch += is_turn
+
+            if self.categorical:
+                steering_command = int(((steering_command + 1.0)/2.0) * (self.classes - 1))
+
+            found_data = not need_turn or is_turn
+            idx = torch.randint(0, len(self.filenames), (1,)).item()
             
         if self.transform:
             image = self.transform(image)
+
+        self.samples_served += 1
+        if self.samples_served % self.batch_size == 0:
+
+            self.samples_served = 0
+            self.turns_served_this_batch = 0
         
         return {'image': image, 'cmd': steering_command}
         

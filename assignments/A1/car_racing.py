@@ -385,7 +385,7 @@ class CarRacing(gym.Env, EzPickle):
                 self.render_indicators(WINDOW_W, WINDOW_H)  # TODO: find why 2x needed, wtf
 
             image_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
-            arr = np.fromstring(image_data.data, dtype=np.uint8, sep='')
+            arr = np.fromstring(image_data.get_data(), dtype=np.uint8, sep='')
             arr = arr.reshape(VP_H, VP_W, 4)
             arr = arr[::-1, :, 0:3]
 

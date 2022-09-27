@@ -12,7 +12,8 @@ from dataset_loader import DrivingDataset
 from driving_policy import DiscreteDrivingPolicy
 from utils import DEVICE, str2bool
 
-def train_discrete(model, iterator, opt, args):
+
+def train_discrete(model: nn.Module, iterator, opt: torch.optim.Adam, args):
     model.train()
 
     loss_hist = []
@@ -23,12 +24,28 @@ def train_discrete(model, iterator, opt, args):
     # Compute the cross_entropy loss with and without weights  
     # Compute the derivatives of the loss w.r.t. network parameters
     # Take a step in the approximate gradient direction using the optimizer opt  
-    
+    if args.weighted_loss:
+        class_weight = 1 / (torch.from_numpy(args.class_dist).to(DEVICE) + 1e-6)
+        criterion = nn.CrossEntropyLoss(weight=class_weight)
+    else:
+        criterion = nn.CrossEntropyLoss()
+
     for i_batch, batch in enumerate(iterator):
 
-        #
-        # YOUR CODE GOES HERE
-        #
+        x = batch['image']
+        y = batch['cmd']
+
+        x = x.to(DEVICE)
+        y = y.to(DEVICE)
+        
+        opt.zero_grad()
+
+        logits = model(x)
+        
+        loss = criterion.forward(logits, y)
+
+        loss.backward()
+        opt.step()
         
         loss = loss.detach().cpu().numpy()
         loss_hist.append(loss)
@@ -98,7 +115,9 @@ def main(args):
     training_dataset = DrivingDataset(root_dir=args.train_dir,
                                       categorical=True,
                                       classes=args.n_steering_classes,
-                                      transform=data_transform)
+                                      transform=data_transform,
+                                      min_turns_per_batch=args.min_turns_per_batch,
+                                      batch_size=args.batch_size)
     
     validation_dataset = DrivingDataset(root_dir=args.validation_dir,
                                         categorical=True,
@@ -106,7 +125,7 @@ def main(args):
                                         transform=data_transform)
     
     training_iterator = DataLoader(training_dataset, batch_size=args.batch_size, shuffle=True, num_workers=1)
-    validation_iterator = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True, num_workers=1)
+    validation_iterator = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=False, num_workers=1)
     driving_policy = DiscreteDrivingPolicy(n_classes=args.n_steering_classes).to(DEVICE)
     
     opt = torch.optim.Adam(driving_policy.parameters(), lr=args.lr)
@@ -122,14 +141,17 @@ def main(args):
     for epoch in range(args.n_epochs):
         print ('EPOCH ', epoch)
 
-        #
-        # YOUR CODE GOES HERE
-        #
-        
         # Train the driving policy
         # Evaluate the driving policy on the validation set
         # If the accuracy on the validation set is a new high then save the network weights 
-        
+
+        train_discrete(driving_policy, training_iterator, opt, args)
+
+        if (epoch + 1) % 40 == 0 or epoch + 1 == args.n_epochs:
+            avg_acc = test_discrete(driving_policy, validation_iterator, opt, args)
+            if avg_acc > best_val_accuracy:
+                best_val_accuracy = avg_acc
+                torch.save(driving_policy.state_dict(), args.weights_out_file)
         
     return driving_policy
 
@@ -147,6 +169,8 @@ if __name__ == "__main__":
     parser.add_argument("--weighted_loss", type=str2bool,
                         help="should you weight the labeled examples differently based on their frequency of occurence",
                         default=False)
+    parser.add_argument("--min_turns_per_batch", type=int, help="minimum number of turning scenes per batch",
+                        default=0)
     
     args = parser.parse_args()
 

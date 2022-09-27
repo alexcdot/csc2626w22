@@ -27,16 +27,22 @@ class DiscreteDrivingPolicy(nn.Module):
 
         
         self.features = nn.Sequential(
-            #
-            # YOUR CODE GOES HERE
-            #
+            nn.Conv2d(3, 24, 4, 2, 1),
+            nn.ReLU(),
+            nn.Conv2d(24, 36, 4, 2, 1),
+            nn.ReLU(),
+            nn.Conv2d(36, 48, 4, 2, 1),
+            nn.ReLU(),
+            nn.Conv2d(48, 64, 4, 2, 1),
+            nn.ReLU(),
             Flatten(),
         )
         
         self.classifier = nn.Sequential(
-            #
-            # YOUR CODE GOES HERE
-            #
+            nn.Linear(4096, 64),
+            nn.ReLU(),
+            nn.Linear(64, self.n_classes),
+            nn.ReLU(),
         )  
         
         self.apply(weights_init)

@@ -11,18 +11,37 @@ import os
 from driving_policy import DiscreteDrivingPolicy
 from utils import DEVICE, str2bool
 
-def run(steering_network, args):
+def get_dagger_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out_dir", help="directory in which to save the expert's data", default='./dataset/train')
+    parser.add_argument("--save_expert_actions", type=str2bool, help="save the images and expert actions in the training set",
+                        default=False)
     
+    parser.add_argument("--expert_drives", type=str2bool, help="should the expert steer the vehicle?", default=False)
+    parser.add_argument("--run_id", type=int, help="Id for this particular data collection run (e.g. dagger iterations)", default=0)
+    parser.add_argument("--timesteps", type=int, help="timesteps of simulation to run, up to one full loop of the track", default=100000)
+    parser.add_argument("--learner_weights", type=str, help="filename from which to load learner weights for the steering network",
+                        default='')
+    parser.add_argument("--n_steering_classes", type=int, help="number of steering classes", default=20)
+    return parser
+
+def run(steering_network, args):
+
     env = FullStateCarRacingEnv()
     env.reset()
     
     learner_action = np.array([0.0, 0.0, 0.0])
     expert_action = None
+    error_headings = []
+    error_dists = []
     
     for t in range(args.timesteps):
         env.render()
         
-        state, expert_action, reward, done, _ = env.step(learner_action) 
+        state, expert_action, reward, done, _, eh, ed = env.step(learner_action) 
+
+        error_headings.append(eh)
+        error_dists.append(ed)
         if done:
             break
         
@@ -42,19 +61,10 @@ def run(steering_network, args):
             imageio.imwrite(os.path.join(args.out_dir, 'expert_%d_%d_%f.jpg' % (args.run_id, t, expert_steer)), state)
 
     env.close()
+    return error_headings, error_dists
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--out_dir", help="directory in which to save the expert's data", default='./dataset/train')
-    parser.add_argument("--save_expert_actions", type=str2bool, help="save the images and expert actions in the training set",
-                        default=False)
-    
-    parser.add_argument("--expert_drives", type=str2bool, help="should the expert steer the vehicle?", default=False)
-    parser.add_argument("--run_id", type=int, help="Id for this particular data collection run (e.g. dagger iterations)", default=0)
-    parser.add_argument("--timesteps", type=int, help="timesteps of simulation to run, up to one full loop of the track", default=100000)
-    parser.add_argument("--learner_weights", type=str, help="filename from which to load learner weights for the steering network",
-                        default='')
-    parser.add_argument("--n_steering_classes", type=int, help="number of steering classes", default=20)
+    parser = get_dagger_parser()
     
     args = parser.parse_args()
     

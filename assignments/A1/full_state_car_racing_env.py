@@ -129,7 +129,7 @@ class FullStateCarRacingEnv(CarRacing):
             print ('Learner deviated too far!')
             done = True
             
-        return self.state, expert_action, step_reward, done, {}
+        return self.state, expert_action, step_reward, done, {}, eh, ed
     
     def reset(self):
         self._destroy()
@@ -217,7 +217,7 @@ class FullStateCarRacingEnv(CarRacing):
                 self.render_indicators(WINDOW_W, WINDOW_H)  
 
             image_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
-            arr = np.fromstring(image_data.data, dtype=np.uint8, sep='')
+            arr = np.fromstring(image_data.get_data(), dtype=np.uint8, sep='')
             arr = arr.reshape(VP_H, VP_W, 4)
             arr = arr[::-1, :, 0:3]
 
