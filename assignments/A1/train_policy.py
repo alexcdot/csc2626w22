@@ -147,6 +147,8 @@ def main(args):
 
         train_discrete(driving_policy, training_iterator, opt, args)
 
+        # Subsample the validation iterations to save time, as we noticed the validation error goes down
+        # dramatically during the final 10 epochs
         if (epoch + 1) % 40 == 0 or epoch + 1 == args.n_epochs:
             avg_acc = test_discrete(driving_policy, validation_iterator, opt, args)
             if avg_acc > best_val_accuracy:
