@@ -31,7 +31,7 @@ if __name__ == "__main__":
     ## Reuse functions in racer.py and train_policy.py
     ## Save the learner weights of the i-th DAgger iteration in ./weights/learner_i.weights where 
     #####
-    dagger_train_dir = args.train_dir + f"_dagger_iters_{args.dagger_iterations}_epochs_{args.n_epochs}"
+    dagger_train_dir = args.train_dir + f"_dagger_iters_{args.dagger_iterations}_epochs_{args.n_epochs}_classes_{args.n_steering_classes}"
     if not os.path.exists(dagger_train_dir):
         os.mkdir(dagger_train_dir)
         shutil.copytree(args.train_dir, dagger_train_dir, dirs_exist_ok=True) 
@@ -48,7 +48,11 @@ if __name__ == "__main__":
         else:
             print ('\nRETRAINING LEARNER ON AGGREGATED DATASET, ITER', dagger_iter)
     
-        args.weights_out_file = f"./weights/learner_{dagger_iter}.weights"
+        weights_dir = f"./weights/dagger_iters_{args.dagger_iterations}_epochs_{args.n_epochs}_classes_{args.n_steering_classes}"
+        if not os.path.exists(weights_dir):
+            os.mkdir(weights_dir)
+
+        args.weights_out_file = f"{weights_dir}/learner_{dagger_iter}.weights"
         train_policy.main(args)
 
         # Load best steering network
@@ -82,6 +86,6 @@ if __name__ == "__main__":
         "aggr_num_steps": aggr_num_steps}
     print(aggr_errors)
 
-    json.dump(aggr_errors, open(f"./outputs_dagger_iters_{args.dagger_iterations}_epochs_{args.n_epochs}", "w"))
+    json.dump(aggr_errors, open(f"./outputs_dagger_iters_{args.dagger_iterations}_epochs_{args.n_epochs}_classes_{args.n_steering_classes}", "w"))
 
             
